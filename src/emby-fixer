@@ -8,6 +8,13 @@ const { fixDirectoryTitles } = require("./lib/emby_updater");
 const { createDB } = require("./lib/db");
 
 async function main() {
+  if (process.argv[2] === "-h" || process.argv[2] === "--help") {
+    console.log(
+      `emby-fixer: Make emby display music directories with their actual title.\nThere are no CLI args. Just configure it and run as root.`
+    );
+    return;
+  }
+
   const db = createDB();
   try {
     const libraryItems = await listLibraryItems();

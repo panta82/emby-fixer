@@ -1,8 +1,6 @@
 # Emby Fixer
 
-Fix emby by editing its database.
-
-Primarily, make music directories actually have directory name as title, instead of some random shit.
+Make emby display music directories with their actual title, instead of some algorithmically derived random shit. This is done by stopping the server, updating its database and restarting.
 
 More info: https://emby.media/community/index.php?/topic/16984-view-libraries-as-they-are-stored-by-folders/page-4
 
