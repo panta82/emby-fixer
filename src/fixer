@@ -4,14 +4,24 @@ require("./settings");
 
 const { withEmbyDisabled } = require("./lib/emby_controller");
 const { listLibraryItems } = require("./lib/library_provider");
-
-//readdirPlus(settings.libraryLocation);
+const { fixDirectoryTitles } = require("./lib/emby_updater");
+const { createDB } = require("./lib/db");
 
 async function main() {
-  const dirs = await listLibraryItems();
-  console.log(dirs);
+  const db = createDB();
+  try {
+    const libraryItems = await listLibraryItems();
 
-  await withEmbyDisabled(async () => {});
+    await withEmbyDisabled(async () => {
+      await fixDirectoryTitles(libraryItems, db);
+    });
+  } catch (err) {
+    console.error(err);
+  } finally {
+    db.close().catch(err => {
+      console.error(err.stack || err);
+    });
+  }
 }
 
 Promise.resolve()

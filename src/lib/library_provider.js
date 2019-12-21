@@ -1,4 +1,5 @@
 const libPath = require("path");
+const libOS = require("os");
 
 const glob = require("glob");
 
@@ -25,6 +26,9 @@ async function listLibraryItems() {
 
 class LibraryItem {
   constructor(path) {
+    if (path[path.length - 1] === libPath.sep) {
+      path = path.slice(0, path.length - 1);
+    }
     this.path = path;
     this.name = libPath.basename(path);
   }

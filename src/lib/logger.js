@@ -7,4 +7,8 @@ const logger = pino({
   prettifier: require("pino-pretty")
 });
 
-module.exports = logger;
+module.exports = {
+  info: msg => logger.info(msg),
+  debug: msg => logger.debug(msg),
+  error: msg => logger.error(msg)
+};
