@@ -1,6 +1,6 @@
 const exec = require("child_process").exec;
 
-const settings = require("./settings");
+const settings = require("../settings");
 const logger = require("./logger");
 
 async function systemctl(cmd, ...services) {

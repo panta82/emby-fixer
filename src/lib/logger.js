@@ -1,6 +1,6 @@
 const pino = require("pino");
 const logger = pino({
-  level: require("./settings").LOGGER_LEVEL,
+  level: require("../settings").LOGGER_LEVEL,
   prettyPrint: {
     levelFirst: true
   },

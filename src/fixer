@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+
+require("./settings");
+
+const { withEmbyDisabled } = require("./lib/emby_controller");
+const { listLibraryItems } = require("./lib/library_provider");
+
+//readdirPlus(settings.libraryLocation);
+
+async function main() {
+  const dirs = await listLibraryItems();
+  console.log(dirs);
+
+  await withEmbyDisabled(async () => {});
+}
+
+Promise.resolve()
+  .then(() => main())
+  .catch(err => {
+    console.error(err.stack || err);
+    process.exit(1);
+  });
