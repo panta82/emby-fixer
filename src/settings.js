@@ -29,16 +29,26 @@ module.exports = {
 
   /**
    * How many files should there be in a directory (including children) for us to convert it
-   * from "album" to "folder".
+   * from "album" to "folder". There will be other conditions applied as well.
    */
-  MAX_FILES_IN_ALBUM: process.env.MAX_FILES_IN_ALBUM || 500,
+  FIX_HUGE_ALBUM_FILES: process.env.FIX_HUGE_ALBUM_FILES || 500,
 
   /**
-   * List of directory prefixes where all subdirectories will be treated as "folders" instead of "albums",
-   * no matter the file count. I added this to cover my "mixes" directory.
+   * Needed ratio (%) of direct children towards total children for us to convert "album" to "folder".
+   */
+  FIX_HUGE_ALBUM_RATIO:
+    "FIX_HUGE_ALBUM_RATIO" in process.env
+      ? Number(process.env.FIX_HUGE_ALBUM_RATIO)
+      : 10,
+
+  /**
+   * List of directory prefixes where all entries will be retitled to directory names, even if they are tagged as "albums".
+   * This is useful for something like a "mix" folder where you just drop random files.
    * Different paths are delimited with pipe ("|") char.
    */
-  NO_ALBUM_ZONES: (process.env.NO_ALBUM_ZONES || "")
+  ADDITIONAL_FIX_TITLE_LOCATIONS: (
+    process.env.ADDITIONAL_FIX_TITLE_LOCATIONS || ""
+  )
     .split("|")
     .filter(Boolean)
 };

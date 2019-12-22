@@ -7,26 +7,21 @@ const BATCH_SIZE = 20;
 
 /**
  * Make sure huge directories are treated as directories, not albums
- * @param {LibraryItem[]} libraryItems
+ * @param {LibraryFolder[]} libraryFolders
  * @param {DB} db
  * @return {Promise<void>}
  */
-async function fixHugeAlbums(libraryItems, db) {
+async function fixHugeAlbums(libraryFolders, db) {
   logger.info(
-    `Finding entries that are marked as albums with more than ${settings.MAX_FILES_IN_ALBUM} files inside...`
+    `Finding entries that are marked as albums with more than ${settings.FIX_HUGE_ALBUM_FILES} files inside...`
   );
 
   const paths = [];
   const countsLookup = {};
-  for (const libraryItem of libraryItems) {
-    if (
-      libraryItem.files > settings.MAX_FILES_IN_ALBUM ||
-      settings.NO_ALBUM_ZONES.some(prefix =>
-        libraryItem.path.startsWith(prefix)
-      )
-    ) {
-      paths.push(libraryItem.path);
-      countsLookup[libraryItem.path] = libraryItem.files;
+  for (const lf of libraryFolders) {
+    if (lf.totalFiles > settings.FIX_HUGE_ALBUM_FILES && lf.childFilesPercent < settings.FIX_HUGE_ALBUM_RATIO) {
+      paths.push(lf.path);
+      countsLookup[lf.path] = lf.totalFiles;
     }
   }
   const placeholders = paths.map(() => "?").join(", ");
@@ -57,7 +52,7 @@ async function fixHugeAlbums(libraryItems, db) {
             logger.info(
               `Converted media item ${row.Id} with ${
                 countsLookup[row.Path]
-              } files to directory (${row.Name})`
+              } files to directory (${row.Path})`
             );
           },
           err => {
@@ -82,70 +77,83 @@ async function fixHugeAlbums(libraryItems, db) {
 
 /**
  * Set correct titles of directory library items
- * @param {LibraryItem[]} libraryItems
+ * @param {LibraryFolder[]} libraryFolders
  * @param {DB} db
  * @return {Promise<void>}
  */
-async function fixDirectoryTitles(libraryItems, db) {
+async function fixDirectoryTitles(libraryFolders, db) {
   logger.info(
-    `Fixing directory titles on ${libraryItems.length} library items...`
+    `Fixing directory titles on ${libraryFolders.length} library items...`
   );
-  const queue = libraryItems.slice();
+  const queue = libraryFolders.slice();
   let processed = 0;
   let fixed = 0;
   while (queue.length) {
     const batch = queue.splice(0, BATCH_SIZE);
     const updates = [];
 
-    const paths = batch.map(item => item.path);
+    const paths = batch.map(lf => lf.path);
     const placeholders = paths.map(_ => "?").join(", ");
     const rows = await db.query(
-      `SELECT Id, Name, Path FROM MediaItems WHERE Path IN (${placeholders})  AND Type = ${DIRECTORY_TYPE}`,
+      `SELECT Id, Name, Path, Type FROM MediaItems WHERE Path IN (${placeholders})`,
       paths
     );
     for (const row of rows) {
-      const item = batch.find(item => item.path === row.Path);
-      if (!item) {
+      const lf = batch.find(lf => lf.path === row.Path);
+      if (!lf) {
         throw new Error(
           `We were expecting that all the items we fetch must be covered`
         );
       }
 
-      if (row.Name !== item.name) {
-        // Need to update it
-        updates.push(
-          db
-            .exec(
-              `UPDATE MediaItems SET Name = $name, SortName = $sortName, IsLocked = 1 WHERE Id = $id`,
-              {
-                $id: row.Id,
-                $name: item.name,
-                $sortName: item.name.toLowerCase() // TODO: They are doing something fancy here with numbering, but meh
-              }
-            )
-            .then(
-              res => {
-                if (res.changes) {
-                  logger.debug(`Fixed: ${item.path}`);
-                  fixed++;
-                }
-              },
-              err => {
-                logger.error(
-                  `Failed to fix "${item.path}": ${err.stack || err}`
-                );
-                throw err;
-              }
-            )
+      if (row.Name === lf.name) {
+        // Nothing to update
+        continue;
+      }
+
+      if (row.Type === ALBUM_TYPE) {
+        const isAdditionalLocation = settings.ADDITIONAL_FIX_TITLE_LOCATIONS.some(
+          prefix => lf.path.startsWith(prefix)
+        );
+        if (!isAdditionalLocation) {
+          // Not a directory and not an additional location. Skip.
+          continue;
+        }
+        logger.debug(
+          `Album at ${lf.path} will have its title fixed because it falls under ADDITIONAL_FIX_TITLE_LOCATIONS`
         );
       }
+
+      updates.push(
+        db
+          .exec(
+            `UPDATE MediaItems SET Name = $name, SortName = $sortName, IsLocked = 1 WHERE Id = $id`,
+            {
+              $id: row.Id,
+              $name: lf.name,
+              $sortName: lf.name.toLowerCase() // TODO: They are doing something fancy here with numbering, but meh
+            }
+          )
+          .then(
+            res => {
+              if (res.changes) {
+                logger.debug(`Fixed: ${lf.path}`);
+                fixed++;
+              }
+            },
+            err => {
+              logger.error(`Failed to fix "${lf.path}": ${err.stack || err}`);
+              throw err;
+            }
+          )
+      );
     }
 
     await Promise.all(updates);
 
     processed += batch.length;
     logger.info(
-      `Processed ${processed} out of ${libraryItems.length} total items (${fixed} fixed)`
+      `Processed ${processed} out of ${libraryFolders.length} total items (${fixed} fixed)`
     );
   }
 

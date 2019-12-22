@@ -7,38 +7,40 @@ const settings = require("../settings");
 const logger = require("./logger");
 
 /**
- * @param {LibraryItem[]} results
+ * @param {LibraryFolder[]} results
  * @param {ReaddirPlusFile} file
+ * @return {LibraryFolder}
  */
 function gatherResultsFromFile(results, file) {
   if (file.type !== "directory") {
     // Only care about directories
-    return 1;
+    return null;
   }
 
-  const result = new LibraryItem(file.path);
-  results.push(result);
+  const lf = new LibraryFolder(file.path);
+  results.push(lf);
 
-  let fileCount = 0;
   for (const child of file.content) {
     if (child.type === "file") {
       // Count files
-      fileCount++;
+      lf.childFiles++;
+      lf.totalFiles++;
     } else {
       // Recursively add child directories
-      fileCount += gatherResultsFromFile(results, child);
+      const childResult = gatherResultsFromFile(results, child);
+      lf.childFolders++;
+      lf.totalFiles += childResult.totalFiles;
+      lf.totalFolders += childResult.totalFolders + 1;
     }
   }
 
-  result.files = fileCount;
-
-  return fileCount;
+  return lf;
 }
 
 /**
- * @return {Promise<LibraryItem[]>}
+ * @return {Promise<LibraryFolder[]>}
  */
-async function listLibraryItems() {
+async function listLibraryFolders() {
   logger.info(`Searching the library at ${settings.LIBRARY_LOCATION} ...`);
   return new Promise((resolve, reject) => {
     return readdirPlus(
@@ -74,17 +76,30 @@ async function listLibraryItems() {
   });
 }
 
-class LibraryItem {
+class LibraryFolder {
   constructor(path) {
     if (path[path.length - 1] === libPath.sep) {
       path = path.slice(0, path.length - 1);
     }
     this.path = path;
     this.name = libPath.basename(path);
-    this.files = 0;
+    this.childFolders = 0;
+    this.childFiles = 0;
+    this.totalFolders = 0;
+    this.totalFiles = 0;
+  }
+
+  /**
+   * Percent of total files that are its direct children
+   * @return {number}
+   */
+  get childFilesPercent() {
+    return this.totalFiles === 0
+      ? 0
+      : (this.childFiles * 100) / this.totalFiles;
   }
 }
 
 module.exports = {
-  listLibraryItems
+  listLibraryFolders
 };

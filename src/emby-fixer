@@ -3,7 +3,7 @@
 require("./settings");
 
 const { withEmbyDisabled } = require("./lib/emby_controller");
-const { listLibraryItems } = require("./lib/library_provider");
+const { listLibraryFolders } = require("./lib/library_provider");
 const { fixDirectoryTitles, fixHugeAlbums } = require("./lib/emby_fixes");
 const { createDB } = require("./lib/db");
 
@@ -21,11 +21,11 @@ There are no CLI args. Just configure it and run as root.
 
   const db = createDB();
   try {
-    const libraryItems = await listLibraryItems();
+    const library = await listLibraryFolders();
 
     await withEmbyDisabled(async () => {
-      await fixHugeAlbums(libraryItems, db);
-      await fixDirectoryTitles(libraryItems, db);
+      await fixHugeAlbums(library, db);
+      await fixDirectoryTitles(library, db);
     });
   } catch (err) {
     console.error(err);
