@@ -1,8 +1,12 @@
 # Emby Fixer
 
-Make emby display music directories with their actual title, instead of some algorithmically derived random shit. This is done by stopping the server, updating its database and restarting.
+Execute a number of fixes on emby's library to make its Music collection functionality usable for folder view. This is done by stopping the server, updating its database and restarting.
 
-More info: https://emby.media/community/index.php?/topic/16984-view-libraries-as-they-are-stored-by-folders/page-4
+Fixes:
+
+- Make emby display music directories with their actual title, instead of some algorithmically derived random shit. More info: https://emby.media/community/index.php?/topic/16984-view-libraries-as-they-are-stored-by-folders/page-4
+
+- Find directories which emby decided to treat as albums and convert them to directories. This is because too big music collections inside one directory tend to clog up the UI and make it unusable.
 
 ### Setup
 

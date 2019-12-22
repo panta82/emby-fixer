@@ -24,6 +24,7 @@ function createDB() {
 
   return /** @lends DB.prototype */ {
     exec,
+    query,
     close
   };
 
@@ -39,6 +40,23 @@ function createDB() {
           reject(err);
         } else {
           resolve(new ExecResult(this.changes, this.lastID));
+        }
+      });
+    });
+  }
+
+  /**
+   * @param sql
+   * @param params
+   * @return {Promise<Object[]>}
+   */
+  async function query(sql, params) {
+    return new Promise((resolve, reject) => {
+      db.all(sql, params, function(err, rows) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows);
         }
       });
     });

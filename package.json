@@ -10,9 +10,9 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^8.2.0",
-    "glob": "^7.1.6",
     "pino": "^5.15.0",
     "pino-pretty": "^3.5.0",
+    "readdir-plus": "^1.1.1",
     "sqlite3": "^4.1.1"
   },
   "devDependencies": {

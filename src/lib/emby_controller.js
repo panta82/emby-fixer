@@ -8,7 +8,7 @@ async function systemctl(cmd, ...services) {
   logger.debug(`CMD: ${command}`);
   return new Promise((resolve, reject) => {
     return exec(command, (err, stdout, stderr) => {
-      if (err.code === 3) {
+      if (err && err.code === 3) {
         // No idea why sudo does this
         err = null;
       }
