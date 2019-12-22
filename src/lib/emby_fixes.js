@@ -4,78 +4,6 @@ const logger = require("./logger");
 const DIRECTORY_TYPE = 3;
 const ALBUM_TYPE = 12;
 const BATCH_SIZE = 20;
-const MAX_FILES_IN_ALBUM = 500;
-
-const PATH_IGNORE_LIST = [
-  /[\/]\.[^\/]+$/ // Unixy hidden directories
-];
-
-/**
- * Set correct titles of directory library items
- * @param {LibraryItem[]} libraryItems
- * @param {DB} db
- * @return {Promise<void>}
- */
-async function fixDirectoryTitles(libraryItems, db) {
-  let ignoredCount = 0;
-  const targetItems = [];
-  for (const libraryItem of libraryItems) {
-    for (const regex of PATH_IGNORE_LIST) {
-      if (regex.test(libraryItem.path)) {
-        ignoredCount++;
-      } else {
-        targetItems.push(libraryItem);
-      }
-    }
-  }
-
-  logger.info(
-    `Fixing directory titles on ${targetItems.length} library items (${ignoredCount} ignored)...`
-  );
-  let checked = 0;
-  let fixed = 0;
-  let batch = [];
-  for (const libraryItem of targetItems) {
-    batch.push(
-      db
-        .exec(
-          `UPDATE MediaItems SET Name = $name, SortName = LOWER($name), IsLocked = 1 WHERE Path = $path AND Type = ${DIRECTORY_TYPE}`,
-          {
-            $name: libraryItem.name,
-            $path: libraryItem.path
-          }
-        )
-        .then(
-          res => {
-            if (res.changes) {
-              logger.info(`Fixed: ${libraryItem.path}`);
-              fixed++;
-            }
-          },
-          err => {
-            logger.error(
-              `Failed to fix "${libraryItem.path}": ${err.stack || err}`
-            );
-            throw err;
-          }
-        )
-    );
-    if (batch.length >= BATCH_SIZE) {
-      await Promise.all(batch);
-      checked += batch.length;
-      logger.info(`Checked ${checked}/${targetItems.length} library items...`);
-      batch = [];
-    }
-  }
-
-  await Promise.all(batch);
-
-  logger.info(
-    `Fixed titles on ${fixed} out of ${targetItems.length} library items`
-  );
-
-  return fixed;
-}
 
 /**
  * Make sure huge directories are treated as directories, not albums
@@ -85,13 +13,18 @@ async function fixDirectoryTitles(libraryItems, db) {
  */
 async function fixHugeAlbums(libraryItems, db) {
   logger.info(
-    `Finding entries that are marked as albums with more than ${MAX_FILES_IN_ALBUM} files inside...`
+    `Finding entries that are marked as albums with more than ${settings.MAX_FILES_IN_ALBUM} files inside...`
   );
 
   const paths = [];
   const countsLookup = {};
   for (const libraryItem of libraryItems) {
-    if (libraryItem.files > MAX_FILES_IN_ALBUM) {
+    if (
+      libraryItem.files > settings.MAX_FILES_IN_ALBUM ||
+      settings.NO_ALBUM_ZONES.some(prefix =>
+        libraryItem.path.startsWith(prefix)
+      )
+    ) {
       paths.push(libraryItem.path);
       countsLookup[libraryItem.path] = libraryItem.files;
     }
@@ -147,7 +80,81 @@ async function fixHugeAlbums(libraryItems, db) {
   return rows.length;
 }
 
+/**
+ * Set correct titles of directory library items
+ * @param {LibraryItem[]} libraryItems
+ * @param {DB} db
+ * @return {Promise<void>}
+ */
+async function fixDirectoryTitles(libraryItems, db) {
+  logger.info(
+    `Fixing directory titles on ${libraryItems.length} library items...`
+  );
+  const queue = libraryItems.slice();
+  let processed = 0;
+  let fixed = 0;
+  while (queue.length) {
+    const batch = queue.splice(0, BATCH_SIZE);
+    const updates = [];
+
+    const paths = batch.map(item => item.path);
+    const placeholders = paths.map(_ => "?").join(", ");
+    const rows = await db.query(
+      `SELECT Id, Name, Path FROM MediaItems WHERE Path IN (${placeholders})  AND Type = ${DIRECTORY_TYPE}`,
+      paths
+    );
+    for (const row of rows) {
+      const item = batch.find(item => item.path === row.Path);
+      if (!item) {
+        throw new Error(
+          `We were expecting that all the items we fetch must be covered`
+        );
+      }
+
+      if (row.Name !== item.name) {
+        // Need to update it
+        updates.push(
+          db
+            .exec(
+              `UPDATE MediaItems SET Name = $name, SortName = $sortName, IsLocked = 1 WHERE Id = $id`,
+              {
+                $id: row.Id,
+                $name: item.name,
+                $sortName: item.name.toLowerCase() // TODO: They are doing something fancy here with numbering, but meh
+              }
+            )
+            .then(
+              res => {
+                if (res.changes) {
+                  logger.debug(`Fixed: ${item.path}`);
+                  fixed++;
+                }
+              },
+              err => {
+                logger.error(
+                  `Failed to fix "${item.path}": ${err.stack || err}`
+                );
+                throw err;
+              }
+            )
+        );
+      }
+    }
+
+    await Promise.all(updates);
+
+    processed += batch.length;
+    logger.info(
+      `Processed ${processed} out of ${libraryItems.length} total items (${fixed} fixed)`
+    );
+  }
+
+  logger.info(`All directory titles have been fixed`);
+
+  return fixed;
+}
+
 module.exports = {
-  fixDirectoryTitles,
-  fixHugeAlbums
+  fixHugeAlbums,
+  fixDirectoryTitles
 };

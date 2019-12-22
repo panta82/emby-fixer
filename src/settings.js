@@ -25,7 +25,22 @@ module.exports = {
   /**
    * Service name we will use to stop and restart emby server
    */
-  EMBY_SERVICE_NAME: process.env.EMBY_SERVICE_NAME || "emby-server.service"
+  EMBY_SERVICE_NAME: process.env.EMBY_SERVICE_NAME || "emby-server.service",
+
+  /**
+   * How many files should there be in a directory (including children) for us to convert it
+   * from "album" to "folder".
+   */
+  MAX_FILES_IN_ALBUM: process.env.MAX_FILES_IN_ALBUM || 500,
+
+  /**
+   * List of directory prefixes where all subdirectories will be treated as "folders" instead of "albums",
+   * no matter the file count. I added this to cover my "mixes" directory.
+   * Different paths are delimited with pipe ("|") char.
+   */
+  NO_ALBUM_ZONES: (process.env.NO_ALBUM_ZONES || "")
+    .split("|")
+    .filter(Boolean)
 };
 
 for (const key in module.exports) {
